@@ -46,6 +46,7 @@ int main(void)
     //start the USB communication
     usb_start();
     //starts the camera
+    //add comment sublime merge
     dcmi_start();
 	po8030_start();
 	//inits the motors
