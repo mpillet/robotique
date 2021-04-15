@@ -11,7 +11,7 @@ extern "C" {
 
 
 //constants for the differents parts of the project
-#define IMAGE_BUFFER_SIZE		640
+
 #define WIDTH_SLOPE				5
 #define MIN_LINE_WIDTH			40
 #define ROTATION_THRESHOLD		10
@@ -23,6 +23,17 @@ extern "C" {
 #define KP						800.0f
 #define KI 						3.5f	//must not be zero
 #define MAX_SUM_ERROR 			(MOTOR_SPEED_LIMIT/KI)
+
+//nos defines
+#define IMAGE_BUFFER_SIZE		640
+typedef enum
+{
+	ANGLE_90_LEFT = 0,
+	ANGLE_45_LEFT,
+	ANGLE_45_RIGHT,
+	ANGLE_90_RIGHT
+} TURN_ANGLES;
+
 
 /** Robot wide IPC bus. */
 extern messagebus_t bus;
