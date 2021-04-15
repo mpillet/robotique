@@ -124,7 +124,6 @@ uint8_t find_angle(uint8_t *buffer_r, uint8_t *buffer_g, uint8_t *buffer_b)
 		return ANGLE_90_RIGHT;
 	}
 
-	return 0;
 }
 
 
