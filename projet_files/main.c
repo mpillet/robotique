@@ -14,6 +14,9 @@
 
 #include <pi_regulator.h>
 #include <process_image.h>
+#include <audio_processing.h>
+
+#define SEND_FROM_MIC
 
 void SendUint8ToComputer(uint8_t* data, uint16_t size) 
 {
@@ -49,11 +52,24 @@ int main(void)
     dcmi_start();
 	po8030_start();
 	//inits the motors
-	//motors_init();
+	motors_init();
+
+
+    //send_tab is used to save the state of the buffer to send (double buffering)
+    //to avoid modifications of the buffer while sending it
+    static float send_tab[FFT_SIZE];
+
+    //lancement des threads
 
 	//stars the threads for the pi regulator and the processing of the image
-	//pi_regulator_start();
+	pi_regulator_start();
 	process_image_start();
+
+#ifdef SEND_FROM_MIC
+    //starts the microphones processing thread.
+    //it calls the callback given in parameter when samples are ready
+    mic_start(&processAudioData);
+#endif  /* SEND_FROM_MIC */
 
     /* Infinite loop. */
     while (1) {

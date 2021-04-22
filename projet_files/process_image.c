@@ -7,19 +7,98 @@
 #include <camera/po8030.h>
 
 #include <process_image.h>
+#include <audio_processing.h>
 
 
-
-
+static float distance_cm = 0;
+static uint16_t line_position = IMAGE_BUFFER_SIZE/2;	//middle
 
 //semaphore
 static BSEMAPHORE_DECL(image_ready_sem, TRUE);
-static uint8_t angle = 0;
 
 /*
  *  Returns the line's width extracted from the image buffer given
  *  Returns 0 if line not found
  */
+uint16_t extract_line_width(uint8_t *buffer){
+
+	uint16_t i = 0, begin = 0, end = 0, width = 0;
+	uint8_t stop = 0, wrong_line = 0, line_not_found = 0;
+	uint32_t mean = 0;
+
+	static uint16_t last_width = PXTOCM/GOAL_DISTANCE;
+
+	//performs an average
+	for(uint16_t i = 0 ; i < IMAGE_BUFFER_SIZE ; i++){
+		mean += buffer[i];
+	}
+	mean /= IMAGE_BUFFER_SIZE;
+
+	do{
+		wrong_line = 0;
+		//search for a begin
+		while(stop == 0 && i < (IMAGE_BUFFER_SIZE - WIDTH_SLOPE))
+		{ 
+			//the slope must at least be WIDTH_SLOPE wide and is compared
+		    //to the mean of the image
+		    if(buffer[i] > mean && buffer[i+WIDTH_SLOPE] < mean)
+		    {
+		        begin = i;
+		        stop = 1;
+		    }
+		    i++;
+		}
+		//if a begin was found, search for an end
+		if (i < (IMAGE_BUFFER_SIZE - WIDTH_SLOPE) && begin)
+		{
+		    stop = 0;
+		    
+		    while(stop == 0 && i < IMAGE_BUFFER_SIZE)
+		    {
+		        if(buffer[i] > mean && buffer[i-WIDTH_SLOPE] < mean)
+		        {
+		            end = i;
+		            stop = 1;
+		        }
+		        i++;
+		    }
+		    //if an end was not found
+		    if (i > IMAGE_BUFFER_SIZE || !end)
+		    {
+		        line_not_found = 1;
+		    }
+		}
+		else//if no begin was found
+		{
+		    line_not_found = 1;
+		}
+
+		//if a line too small has been detected, continues the search
+		if(!line_not_found && (end-begin) < MIN_LINE_WIDTH){
+			i = end;
+			begin = 0;
+			end = 0;
+			stop = 0;
+			wrong_line = 1;
+		}
+	}while(wrong_line);
+
+	if(line_not_found){
+		begin = 0;
+		end = 0;
+		width = last_width;
+	}else{
+		last_width = width = (end - begin);
+		line_position = (begin + end)/2; //gives the line position.
+	}
+
+	//sets a maximum width or returns the measured width
+	if((PXTOCM/width) > MAX_DISTANCE){
+		return PXTOCM/MAX_DISTANCE;
+	}else{
+		return width;
+	}
+}
 
 static THD_WORKING_AREA(waCaptureImage, 256);
 static THD_FUNCTION(CaptureImage, arg) {
@@ -44,92 +123,64 @@ static THD_FUNCTION(CaptureImage, arg) {
 }
 
 
-static THD_WORKING_AREA(waProcessImage, 4096);
-static THD_FUNCTION(ProcessImage, arg)
-{
+static THD_WORKING_AREA(waProcessImage, 1024);
+static THD_FUNCTION(ProcessImage, arg) {
+
     chRegSetThreadName(__FUNCTION__);
     (void)arg;
-	uint8_t *img_buff_ptr;
-	uint8_t image_r[IMAGE_BUFFER_SIZE] = {0};
-	uint8_t image_g[IMAGE_BUFFER_SIZE] = {0};
-	uint8_t image_b[IMAGE_BUFFER_SIZE] = {0};
-	//bool send_to_computer = true;
 
-    while(1)
-    {
+	uint8_t *img_buff_ptr;
+	uint8_t image[IMAGE_BUFFER_SIZE] = {0};
+	uint16_t lineWidth = 0;
+
+	bool send_to_computer = true;
+
+    while(1){
     	//waits until an image has been captured
         chBSemWait(&image_ready_sem);
 		//gets the pointer to the array filled with the last image in RGB565    
 		img_buff_ptr = dcmi_get_last_image_ptr();
 
+		//Extracts only the red pixels
 		for(uint16_t i = 0 ; i < (2 * IMAGE_BUFFER_SIZE) ; i+=2)
 		{
-			image_r[i/2] = (uint8_t)img_buff_ptr[i]&0xF8 >> 2;		//Extracts only the red pixels
-			image_g[i/2] = (uint8_t)img_buff_ptr[i]&0x07 << 3;		//Extracts only the 3 first green pixels
-			image_g[i/2] |= (uint8_t)img_buff_ptr[i+1]&0xE0 >> 5;		//Extracts only the 3 last green pixels
-			image_b[i/2] = (uint8_t)img_buff_ptr[i+1]&0x1F << 1;		//Extracts only the blue pixels
+			//extracts first 5bits of the first byte
+			//takes nothing from the second byte
+
+			image[i/2] = (uint8_t)img_buff_ptr[i]&0xF8;		//Extracts only the red pixels
+			//image[i/2] = (uint8_t)img_buff_ptr[i]&0x07 << 5;		//Extracts only the 3 first green pixels
+			//image[i/2] |= (uint8_t)img_buff_ptr[i+1]&0xE0 >> 3;		//Extracts only the 3 last green pixels
+			//image[i/2] = (uint8_t)img_buff_ptr[i+1]&0x1F << 3;		//Extracts only the blue pixels
+
+	}
+
+		//search for a line in the image and gets its width in pixels
+		lineWidth = extract_line_width(image);
+
+		//converts the width into a distance between the robot and the camera
+		if(lineWidth){
+			distance_cm = PXTOCM/lineWidth;
 		}
 
-
-
-		angle = find_angle(image_r, image_g, image_b);
-		chprintf((BaseSequentialStream *)&SD3, "angle = %d\n", angle);
-
-
-//		if(send_to_computer)
-//		{
-//			//sends to the computer the image
-//			SendUint8ToComputer(image, IMAGE_BUFFER_SIZE);
-//
-//		}
+		if(send_to_computer){
+			//sends to the computer the image
+			SendUint8ToComputer(image, IMAGE_BUFFER_SIZE);
+		}
 		//invert the bool
-		//send_to_computer = !send_to_computer;
+		send_to_computer = !send_to_computer;
     }
 }
 
 
-uint8_t find_angle(uint8_t *buffer_r, uint8_t *buffer_g, uint8_t *buffer_b)
-{
-	uint32_t mean_r = 0, mean_g = 0, mean_b = 0;
-
-	//calculate the mean for one line and for each color (red, green, blue)
-	for(uint16_t i = 0 ; i < IMAGE_BUFFER_SIZE ; i++)
-	{
-		mean_r += buffer_r[i];
-		mean_g += buffer_g[i];
-		mean_b += buffer_b[i];
-	}
-	mean_r /= IMAGE_BUFFER_SIZE;
-	mean_g /= IMAGE_BUFFER_SIZE;
-	mean_b /= IMAGE_BUFFER_SIZE;
-
-//	chprintf((BaseSequentialStream *)&SD3,"r = %d, g = %d, b = %d\n", mean_r, mean_g, mean_b);
-//	chprintf((BaseSequentialStream *)&SD3, "g = %d\n", mean_g);
-//	chprintf((BaseSequentialStream *)&SD3, "b = %d\n", mean_b);
-
-	if((mean_r > mean_b) && (mean_r > mean_g))
-	{
-		return ANGLE_90_LEFT;
-	}
-	else if((mean_g > mean_r) && (mean_g > mean_b))
-	{
-		return ANGLE_45_LEFT;
-	}
-	else if((mean_b > mean_r) && (mean_b > mean_g))
-	{
-		return ANGLE_45_RIGHT;
-	}
-	else
-	{
-		return ANGLE_90_RIGHT;
-	}
-
+float get_distance_cm(void){
+	return distance_cm;
 }
 
+uint16_t get_line_position(void){
+	return line_position;
+}
 
-
-void process_image_start(void)
-{
+void process_image_start(void){
 	chThdCreateStatic(waProcessImage, sizeof(waProcessImage), NORMALPRIO, ProcessImage, NULL);
 	chThdCreateStatic(waCaptureImage, sizeof(waCaptureImage), NORMALPRIO, CaptureImage, NULL);
 }
