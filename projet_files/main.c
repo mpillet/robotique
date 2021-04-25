@@ -10,11 +10,13 @@
 #include <main.h>
 #include <motors.h>
 #include <camera/po8030.h>
+#include <sensors/proximity.h>
 #include <chprintf.h>
 
 #include <pi_regulator.h>
 #include <process_image.h>
 #include <audio_processing.h>
+
 
 #define SEND_FROM_MIC
 
@@ -53,6 +55,10 @@ int main(void)
 	po8030_start();
 	//inits the motors
 	motors_init();
+	//init sensors
+	proximity_start();
+	chprintf((BaseSequentialStream *)&SD3, "sensor 0 = %d\n", get_ambient_light(0));
+
 
 
     //send_tab is used to save the state of the buffer to send (double buffering)
