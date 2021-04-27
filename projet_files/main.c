@@ -56,8 +56,8 @@ int main(void)
 	//inits the motors
 	motors_init();
 	//init sensors
-	proximity_start();
-	chprintf((BaseSequentialStream *)&SD3, "sensor 0 = %d\n", get_ambient_light(0));
+	//proximity_start();
+	//chprintf((BaseSequentialStream *)&SD3, "sensor 0 = %d\n", get_ambient_light(0));
 
 
 
