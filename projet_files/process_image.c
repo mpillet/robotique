@@ -8,6 +8,7 @@
 
 #include <process_image.h>
 #include <audio_processing.h>
+#include <sensors/proximity.h>
 
 
 static float distance_cm = 0;
@@ -33,6 +34,9 @@ uint16_t extract_line_width(uint8_t *buffer){
 		mean += buffer[i];
 	}
 	mean /= IMAGE_BUFFER_SIZE;
+	chprintf((BaseSequentialStream *)&SDU1, "sensor 0 = %d\n", get_calibrated_prox(0));
+
+	//chprintf((BaseSequentialStream *)&SDU1, "mean = %d\n", mean);
 
 	do{
 		wrong_line = 0;

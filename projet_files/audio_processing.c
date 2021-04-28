@@ -63,7 +63,6 @@ void sound_remote(float* data)
 		}
 	}
 
-//	chprintf((BaseSequentialStream *)&SDU1, "freq = %d\n", max_norm_index );
 
 
 	//go right
