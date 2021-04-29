@@ -14,26 +14,26 @@
 static bool ready_to_turn = 0;
 
 //simple PI regulator implementation
-int16_t pi_regulator(float distance, float goal){
+int16_t pi_regulator(float width, float goal){
 
 	float error = 0;
 	float speed = 0;
 
 	static float sum_error = 0;
 
-	error = distance - goal;
+	error = goal-width;
 
 	//disables the PI regulator if the error is to small
 	//this avoids to always move as we cannot exactly be where we want and 
 	//the camera is a bit noisy
-	if(fabs(error) < ERROR_THRESHOLD || !(get_ready_to_go()))
+	if(error < 0 || !(get_ready_to_go()))
 	{
 		ready_to_turn = 1;
 		clear_ready_to_go();
 		return 0;
 	}
 
-    return 1100;
+    return 500;
 }
 
 static THD_WORKING_AREA(waPiRegulator, 256);
@@ -55,7 +55,7 @@ static THD_FUNCTION(PiRegulator, arg)
 
 			//computes the speed to give to the motors
 			//distance_cm is modified by the image processing thread
-			speed = pi_regulator(get_distance_cm(), GOAL_DISTANCE);
+			speed = pi_regulator(get_lineWidth(), STOP_LINE_WIDTH);
 
 			//applies the speed from the PI regulator and the correction for the rotation
 			right_motor_set_speed(speed);

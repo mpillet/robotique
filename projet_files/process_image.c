@@ -11,8 +11,8 @@
 #include <sensors/proximity.h>
 
 
-static float distance_cm = 0;
 static uint16_t line_position = IMAGE_BUFFER_SIZE/2;	//middle
+static uint16_t lineWidth = 0;
 
 //semaphore
 static BSEMAPHORE_DECL(image_ready_sem, TRUE);
@@ -26,59 +26,58 @@ uint16_t extract_line_width(uint8_t *buffer){
 	uint16_t i = 0, begin = 0, end = 0, width = 0;
 	uint8_t stop = 0, wrong_line = 0, line_not_found = 0;
 	uint32_t mean = 0;
+	static uint16_t last_width = 0;
 
-	static uint16_t last_width = PXTOCM/GOAL_DISTANCE;
 
 	//performs an average
 	for(uint16_t i = 0 ; i < IMAGE_BUFFER_SIZE ; i++){
 		mean += buffer[i];
 	}
 	mean /= IMAGE_BUFFER_SIZE;
-	chprintf((BaseSequentialStream *)&SDU1, "sensor 0 = %d\n", get_calibrated_prox(0));
 
-	//chprintf((BaseSequentialStream *)&SDU1, "mean = %d\n", mean);
-
-	do{
+	do
+	{
 		wrong_line = 0;
 		//search for a begin
 		while(stop == 0 && i < (IMAGE_BUFFER_SIZE - WIDTH_SLOPE))
-		{ 
+		{
 			//the slope must at least be WIDTH_SLOPE wide and is compared
-		    //to the mean of the image
-		    if(buffer[i] > mean && buffer[i+WIDTH_SLOPE] < mean)
-		    {
-		        begin = i;
-		        stop = 1;
-		    }
-		    i++;
+			//to the mean of the image
+			if(buffer[i] > mean && buffer[i+WIDTH_SLOPE] < mean)
+			{
+				begin = i;
+				stop = 1;
+			}
+			i++;
 		}
 		//if a begin was found, search for an end
 		if (i < (IMAGE_BUFFER_SIZE - WIDTH_SLOPE) && begin)
 		{
-		    stop = 0;
-		    
-		    while(stop == 0 && i < IMAGE_BUFFER_SIZE)
-		    {
-		        if(buffer[i] > mean && buffer[i-WIDTH_SLOPE] < mean)
-		        {
-		            end = i;
-		            stop = 1;
-		        }
-		        i++;
-		    }
-		    //if an end was not found
-		    if (i > IMAGE_BUFFER_SIZE || !end)
-		    {
-		        line_not_found = 1;
-		    }
+			stop = 0;
+
+			while(stop == 0 && i < IMAGE_BUFFER_SIZE)
+			{
+				if(buffer[i] > mean && buffer[i-WIDTH_SLOPE] < mean)
+				{
+					end = i;
+					stop = 1;
+				}
+				i++;
+			}
+			//if an end was not found
+			if (i > IMAGE_BUFFER_SIZE || !end)
+			{
+				line_not_found = 1;
+			}
 		}
 		else//if no begin was found
 		{
-		    line_not_found = 1;
+			line_not_found = 1;
 		}
 
-		//if a line too small has been detected, continues the search
-		if(!line_not_found && (end-begin) < MIN_LINE_WIDTH){
+		//if a line too small has been detected
+		if(!line_not_found && ((end-begin) < MIN_LINE_WIDTH || (end-begin) > MAX_PIX))
+		{
 			i = end;
 			begin = 0;
 			end = 0;
@@ -87,21 +86,22 @@ uint16_t extract_line_width(uint8_t *buffer){
 		}
 	}while(wrong_line);
 
-	if(line_not_found){
+	if(line_not_found || wrong_line)
+	{
 		begin = 0;
 		end = 0;
-		width = last_width;
-	}else{
+		width = 0;
+
+	}
+	else
+	{
 		last_width = width = (end - begin);
 		line_position = (begin + end)/2; //gives the line position.
 	}
 
-	//sets a maximum width or returns the measured width
-	if((PXTOCM/width) > MAX_DISTANCE){
-		return PXTOCM/MAX_DISTANCE;
-	}else{
-		return width;
-	}
+	chprintf((BaseSequentialStream *)&SDU1, "BOUCLE NOT FOUND = %d\n", width);
+
+	return width;
 }
 
 static THD_WORKING_AREA(waCaptureImage, 256);
@@ -128,18 +128,20 @@ static THD_FUNCTION(CaptureImage, arg) {
 
 
 static THD_WORKING_AREA(waProcessImage, 1024);
-static THD_FUNCTION(ProcessImage, arg) {
+static THD_FUNCTION(ProcessImage, arg)
+{
 
     chRegSetThreadName(__FUNCTION__);
     (void)arg;
 
 	uint8_t *img_buff_ptr;
 	uint8_t image[IMAGE_BUFFER_SIZE] = {0};
-	uint16_t lineWidth = 0;
+
 
 	bool send_to_computer = true;
 
-    while(1){
+    while(1)
+    {
     	//waits until an image has been captured
         chBSemWait(&image_ready_sem);
 		//gets the pointer to the array filled with the last image in RGB565    
@@ -150,34 +152,28 @@ static THD_FUNCTION(ProcessImage, arg) {
 		{
 			//extracts first 5bits of the first byte
 			//takes nothing from the second byte
-
 			image[i/2] = (uint8_t)img_buff_ptr[i]&0xF8;		//Extracts only the red pixels
-			//image[i/2] = (uint8_t)img_buff_ptr[i]&0x07 << 5;		//Extracts only the 3 first green pixels
-			//image[i/2] |= (uint8_t)img_buff_ptr[i+1]&0xE0 >> 3;		//Extracts only the 3 last green pixels
-			//image[i/2] = (uint8_t)img_buff_ptr[i+1]&0x1F << 3;		//Extracts only the blue pixels
-
-	}
+		}
 
 		//search for a line in the image and gets its width in pixels
 		lineWidth = extract_line_width(image);
 
-		//converts the width into a distance between the robot and the camera
-		if(lineWidth){
-			distance_cm = PXTOCM/lineWidth;
-		}
-
-		if(send_to_computer){
+		if(send_to_computer)
+		{
 			//sends to the computer the image
 			SendUint8ToComputer(image, IMAGE_BUFFER_SIZE);
 		}
+
 		//invert the bool
 		send_to_computer = !send_to_computer;
-    }
+
+	}
 }
 
 
-float get_distance_cm(void){
-	return distance_cm;
+
+float get_lineWidth(void){
+	return lineWidth;
 }
 
 uint16_t get_line_position(void){
