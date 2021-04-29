@@ -13,7 +13,7 @@ extern "C" {
 //constants for the differents parts of the project
 #define IMAGE_BUFFER_SIZE		640
 #define WIDTH_SLOPE				15
-#define MIN_LINE_WIDTH			20
+#define MIN_LINE_WIDTH			50
 #define ROTATION_THRESHOLD		10
 #define ROTATION_COEFF			2 
 #define PXTOCM					1570.0f //experimental value
@@ -24,6 +24,8 @@ extern "C" {
 #define KP						800.0f
 #define KI 						3.5f	//must not be zero
 #define MAX_SUM_ERROR 			(MOTOR_SPEED_LIMIT/KI)
+#define STOP					1
+#define CONTINUE				0
 
 /** Robot wide IPC bus. */
 extern messagebus_t bus;

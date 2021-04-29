@@ -12,7 +12,7 @@
 
 
 static uint16_t line_position = IMAGE_BUFFER_SIZE/2;	//middle
-static uint16_t lineWidth = 0;
+static bool state = 0;
 
 //semaphore
 static BSEMAPHORE_DECL(image_ready_sem, TRUE);
@@ -21,7 +21,7 @@ static BSEMAPHORE_DECL(image_ready_sem, TRUE);
  *  Returns the line's width extracted from the image buffer given
  *  Returns 0 if line not found
  */
-uint16_t extract_line_width(uint8_t *buffer){
+bool extract_line_width(uint8_t *buffer){
 
 	uint16_t i = 0, begin = 0, end = 0, width = 0;
 	uint8_t stop = 0, wrong_line = 0, line_not_found = 0;
@@ -91,17 +91,18 @@ uint16_t extract_line_width(uint8_t *buffer){
 		begin = 0;
 		end = 0;
 		width = 0;
-
+		state = CONTINUE;
 	}
 	else
 	{
 		last_width = width = (end - begin);
 		line_position = (begin + end)/2; //gives the line position.
+		state = STOP;
 	}
 
-	chprintf((BaseSequentialStream *)&SDU1, "BOUCLE NOT FOUND = %d\n", width);
+//	chprintf((BaseSequentialStream *)&SDU1, "BOUCLE NOT FOUND = %d\n", width);
 
-	return width;
+	return state;
 }
 
 static THD_WORKING_AREA(waCaptureImage, 256);
@@ -156,7 +157,7 @@ static THD_FUNCTION(ProcessImage, arg)
 		}
 
 		//search for a line in the image and gets its width in pixels
-		lineWidth = extract_line_width(image);
+		state = extract_line_width(image);
 
 		if(send_to_computer)
 		{
@@ -172,8 +173,8 @@ static THD_FUNCTION(ProcessImage, arg)
 
 
 
-float get_lineWidth(void){
-	return lineWidth;
+bool get_state(void){
+	return state;
 }
 
 uint16_t get_line_position(void){
