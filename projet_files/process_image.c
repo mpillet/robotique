@@ -97,6 +97,8 @@ bool extract_line_width(uint8_t *buffer){
 	{
 		last_width = width = (end - begin);
 		line_position = (begin + end)/2; //gives the line position.
+		chprintf((BaseSequentialStream *)&SDU1, "width_pix = %d\n", width);
+
 		state = STOP;
 	}
 

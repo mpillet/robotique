@@ -77,7 +77,7 @@ void sound_remote(float* data)
 		left_motor_set_speed(-300);
 		right_motor_set_speed(300);
 	}
-	else
+	else												//à changer pour pas qu'il reparte au moindre mini bruit ?
 	{
 		left_motor_set_speed(0);
 		right_motor_set_speed(0);
