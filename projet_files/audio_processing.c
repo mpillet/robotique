@@ -63,6 +63,7 @@ void sound_remote(float* data)
 		}
 	}
 
+	//chprintf((BaseSequentialStream *)&SDU1, "freq = %d\n", max_norm_index);
 
 
 	//go right
@@ -77,13 +78,14 @@ void sound_remote(float* data)
 		left_motor_set_speed(-300);
 		right_motor_set_speed(300);
 	}
-	else												//à changer pour pas qu'il reparte au moindre mini bruit ?
+	else
 	{
 		left_motor_set_speed(0);
 		right_motor_set_speed(0);
 		ready_to_go = 1;
 		clear_ready_to_turn();
 	}
+
 
 }
 
