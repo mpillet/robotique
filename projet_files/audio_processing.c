@@ -15,13 +15,11 @@
 
 
 #define MIN_VALUE_THRESHOLD 10000
-#define MIN_FREQ 10 //we don’t analyze before this index to not use resources for nothing
+#define MIN_FREQ 10 	//we don’t analyze before this index to not use resources for nothing
 #define LEFT_FREQ 15	//230 Hz
 #define RIGHT_FREQ 20	//300 Hz
-#define MAX_FREQ 30 //we don’t analyze after this index to not use resources for nothing
+#define MAX_FREQ 30 	//we don’t analyze after this index to not use resources for nothing
 #define MARGE 1
-
-
 
 //semaphore
 static BSEMAPHORE_DECL(sendToComputer_sem, TRUE);
@@ -39,6 +37,7 @@ static float micBack_output[FFT_SIZE];
 
 static bool ready_to_go = 1;
 
+
 /*
 *	Callback called when the demodulation of the four microphones is done.
 *	We get 160 samples per mic every 10ms (16kHz)
@@ -49,44 +48,59 @@ static bool ready_to_go = 1;
 *	uint16_t num_samples	Tells how many data we get in total (should always be 640)
 */
 
-void sound_remote(float* data)
+void sound_remote(float* data_left, float* data_right)
 {
-	float max_norm = MIN_VALUE_THRESHOLD;
-	int16_t max_norm_index = -1;
-	//search for the highest peak
+	float max_norm_left = MIN_VALUE_THRESHOLD;
+	int16_t max_norm_index_left = -1;
+	float max_norm_right = MIN_VALUE_THRESHOLD;
+	int16_t max_norm_index_right = -1;
+	static bool already_turned = 0;
+	//search for the highest peak left microphone
 	for(uint16_t i = MIN_FREQ ; i <= MAX_FREQ ; i++)
 	{
-		if(data[i] > max_norm)
+		if(data_left[i] > max_norm_left)
 		{
-			max_norm = data[i];
-			max_norm_index = i;
+			max_norm_left = data_left[i];
+			max_norm_index_left = i;
+		}
+	}
+	//search for the highest peak right microphone
+	for(uint16_t i = MIN_FREQ ; i <= MAX_FREQ ; i++)
+	{
+		if(data_right[i] > max_norm_right)
+		{
+			max_norm_right = data_right[i];
+			max_norm_index_right = i;
 		}
 	}
 
-	//chprintf((BaseSequentialStream *)&SDU1, "freq = %d\n", max_norm_index);
-
-
 	//go right
-	if(max_norm_index >= RIGHT_FREQ-MARGE && max_norm_index <= RIGHT_FREQ+MARGE)
+	if((max_norm_index_left >= RIGHT_FREQ-MARGE && max_norm_index_left <= RIGHT_FREQ+MARGE) &&
+	   (max_norm_index_right >= RIGHT_FREQ-MARGE && max_norm_index_right <= RIGHT_FREQ+MARGE))
 	{
 		left_motor_set_speed(300);
 		right_motor_set_speed(-300);
+		already_turned = 1;
 	}
 	//go left
-	else if(max_norm_index >= LEFT_FREQ-MARGE && max_norm_index <= LEFT_FREQ+MARGE)
+	else if((max_norm_index_left >= LEFT_FREQ-MARGE && max_norm_index_left <= LEFT_FREQ+MARGE) &&
+			(max_norm_index_right >= LEFT_FREQ-MARGE && max_norm_index_right <= LEFT_FREQ+MARGE))
 	{
 		left_motor_set_speed(-300);
 		right_motor_set_speed(300);
+		already_turned = 1;
+
 	}
 	else
 	{
 		left_motor_set_speed(0);
 		right_motor_set_speed(0);
-		ready_to_go = 1;
-		clear_ready_to_turn();
+		if(already_turned)
+		{
+			ready_to_go = 1;
+			clear_ready_to_turn();
+		}
 	}
-
-
 }
 
 bool get_ready_to_go(void)
@@ -165,19 +179,16 @@ void processAudioData(int16_t *data, uint16_t num_samples){
 		}
 		nb_samples = 0;
 		mustSend++;
-		sound_remote(micLeft_output);
+		sound_remote(micLeft_output, micRight_output);
 		}
 	}
 }
 
 
-
-
-
-
 void wait_send_to_computer(void){
 	chBSemWait(&sendToComputer_sem);
 }
+
 
 float* get_audio_buffer_ptr(BUFFER_NAME_t name){
 	if(name == LEFT_CMPLX_INPUT){

@@ -13,7 +13,7 @@
 #include <msgbus/messagebus.h>
 #include <sensors/proximity.h>
 #include <chprintf.h>
-
+#include <selector.h>
 #include <pi_regulator.h>
 #include <process_image.h>
 #include <audio_processing.h>
@@ -46,11 +46,9 @@ static void serial_start(void)
 
 int main(void)
 {
-
     halInit();
     chSysInit();
     mpu_init();
-
     //starts the serial communication
     serial_start();
     //start the USB communication
@@ -66,22 +64,25 @@ int main(void)
 	proximity_start();
 	calibrate_ir();
 
+//	init_selector();
 
     //send_tab is used to save the state of the buffer to send (double buffering)
     //to avoid modifications of the buffer while sending it
     static float send_tab[FFT_SIZE];
 
     //lancement des threads
+//    if(get_selector()==ON)
+//    {
+    	//stars the threads for the pi regulator and the processing of the image
+    	pi_regulator_start();
+    	process_image_start();
 
-	//stars the threads for the pi regulator and the processing of the image
-	pi_regulator_start();
-	process_image_start();
-
-#ifdef SEND_FROM_MIC
-    //starts the microphones processing thread.
-    //it calls the callback given in parameter when samples are ready
-    mic_start(&processAudioData);
-#endif  /* SEND_FROM_MIC */
+    #ifdef SEND_FROM_MIC
+    	//starts the microphones processing thread.
+    	//it calls the callback given in parameter when samples are ready
+    	mic_start(&processAudioData);
+    #endif  /* SEND_FROM_MIC */
+//    }
 
     /* Infinite loop. */
     while (1) {
