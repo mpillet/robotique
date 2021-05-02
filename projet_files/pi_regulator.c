@@ -3,8 +3,6 @@
 #include <math.h>
 #include <usbcfg.h>
 #include <chprintf.h>
-
-
 #include <main.h>
 #include <motors.h>
 #include <pi_regulator.h>
@@ -12,18 +10,24 @@
 #include <audio_processing.h>
 #include <sensors/proximity.h>
 #include <leds.h>
+#include <audio/play_melody.h>
 
 
 static bool ready_to_turn = 0;
 
 //simple PI regulator implementation
-bool pi_regulator(bool state){
+bool pi_regulator(bool state, uint16_t sensor_1, uint16_t sensor_8){
+
 
 	//disables the PI regulator if the error is to small
 	//this avoids to always move as we cannot exactly be where we want and 
 	//the camera is a bit noisy
-	if((state == STOP) || !(get_ready_to_go()))
+	if((state == STOP) || !(get_ready_to_go()) || (sensor_1 > 200 && sensor_8 > 200))
 	{
+//		chprintf((BaseSequentialStream *)&SDU1, "sensor_1 = %d\n", get_calibrated_prox(0));
+//		chprintf((BaseSequentialStream *)&SDU1, "sensor_8 = %d\n", get_calibrated_prox(7));
+
+		//stopCurrentMelody();
 		ready_to_turn = 1;
 		clear_ready_to_go();
 		return STOP;
@@ -43,7 +47,11 @@ static THD_FUNCTION(PiRegulator, arg)
 	uint16_t speed = 0;
 	uint16_t sensor_4 = 0;
 	uint16_t sensor_5 = 0;
+	uint16_t sensor_1 = 0;
+	uint16_t sensor_8 = 0;
 	uint16_t mean = 0;
+	melody_t* song = NULL;
+
 
 
 	while(1)
@@ -51,8 +59,11 @@ static THD_FUNCTION(PiRegulator, arg)
 		if(get_ready_to_go())
 		{
 			time = chVTGetSystemTime();
+			//playMelody(PIRATES_OF_THE_CARIBBEAN, ML_SIMPLE_PLAY, song);
 			sensor_4 = get_calibrated_prox(3);
 			sensor_5 = get_calibrated_prox(4);
+			sensor_1 = get_calibrated_prox(0);
+			sensor_8 = get_calibrated_prox(7);
 			mean = (sensor_4+sensor_5)/2.;
 
 
@@ -69,13 +80,12 @@ static THD_FUNCTION(PiRegulator, arg)
 				speed = DEFAULT_SPEED;
 			}
 
-			if(pi_regulator(get_state()) == STOP)
+			if(pi_regulator(get_state(), sensor_1, sensor_8) == STOP)
 			{
 				speed = 0;
 			}
 
 			animation(speed);
-//			chprintf((BaseSequentialStream *)&SDU1, "vitesse = %d\n", speed);
 
 
 			//applies the speed from the PI regulator and the correction for the rotation

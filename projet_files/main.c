@@ -17,6 +17,8 @@
 #include <pi_regulator.h>
 #include <process_image.h>
 #include <audio_processing.h>
+#include <audio/play_melody.h>
+
 
 messagebus_t bus;
 MUTEX_DECL(bus_lock);
@@ -63,7 +65,9 @@ int main(void)
 	//init sensors
 	proximity_start();
 	calibrate_ir();
-
+	//init melody
+	playMelodyStart();
+	dac_start();
 //	init_selector();
 
     //send_tab is used to save the state of the buffer to send (double buffering)
