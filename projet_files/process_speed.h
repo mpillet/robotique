@@ -1,5 +1,5 @@
-#ifndef PI_REGULATOR_H
-#define PI_REGULATOR_H
+#ifndef PROCESS_SPEED_H
+#define PROCESS_SPEED_H
 
 //start the PI regulator thread
 void pi_regulator_start(void);
@@ -8,4 +8,4 @@ void clear_ready_to_turn(void);
 void animation(uint16_t);
 
 
-#endif /* PI_REGULATOR_H */
+#endif /* PROCESS_SPEED */

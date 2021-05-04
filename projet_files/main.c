@@ -13,11 +13,10 @@
 #include <msgbus/messagebus.h>
 #include <sensors/proximity.h>
 #include <chprintf.h>
-#include <selector.h>
-#include <pi_regulator.h>
 #include <process_image.h>
-#include <audio_processing.h>
 #include <audio/play_melody.h>
+#include <process_audio.h>
+#include <process_speed.h>
 
 
 messagebus_t bus;
@@ -68,25 +67,24 @@ int main(void)
 	//init melody
 	playMelodyStart();
 	dac_start();
-//	init_selector();
 
     //send_tab is used to save the state of the buffer to send (double buffering)
     //to avoid modifications of the buffer while sending it
     static float send_tab[FFT_SIZE];
 
     //lancement des threads
-//    if(get_selector()==ON)
-//    {
-    	//stars the threads for the pi regulator and the processing of the image
-    	pi_regulator_start();
-    	process_image_start();
+    //stars the threads for the pi regulator and the processing of the image
+    chprintf((BaseSequentialStream *)&SDU1, "start = %d\n", get_selector());
 
-    #ifdef SEND_FROM_MIC
-    	//starts the microphones processing thread.
-    	//it calls the callback given in parameter when samples are ready
-    	mic_start(&processAudioData);
-    #endif  /* SEND_FROM_MIC */
-//    }
+    pi_regulator_start();
+    process_image_start();
+
+#ifdef SEND_FROM_MIC
+    //starts the microphones processing thread.
+    //it calls the callback given in parameter when samples are ready
+    mic_start(&processAudioData);
+#endif  /* SEND_FROM_MIC */
+
 
     /* Infinite loop. */
     while (1) {

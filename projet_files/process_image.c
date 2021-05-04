@@ -7,8 +7,8 @@
 #include <camera/po8030.h>
 
 #include <process_image.h>
-#include <audio_processing.h>
 #include <sensors/proximity.h>
+#include <process_audio.h>
 
 
 static uint16_t line_position = IMAGE_BUFFER_SIZE/2;	//middle
@@ -102,7 +102,6 @@ bool extract_line_width(uint8_t *buffer){
 		state = STOP;
 	}
 
-//	chprintf((BaseSequentialStream *)&SDU1, "BOUCLE NOT FOUND = %d\n", width);
 
 	return state;
 }
@@ -184,6 +183,6 @@ uint16_t get_line_position(void){
 }
 
 void process_image_start(void){
-	chThdCreateStatic(waProcessImage, sizeof(waProcessImage), NORMALPRIO, ProcessImage, NULL);
-	chThdCreateStatic(waCaptureImage, sizeof(waCaptureImage), NORMALPRIO, CaptureImage, NULL);
+	chThdCreateStatic(waProcessImage, sizeof(waProcessImage), NORMALPRIO+2, ProcessImage, NULL);
+	chThdCreateStatic(waCaptureImage, sizeof(waCaptureImage), NORMALPRIO+2, CaptureImage, NULL);
 }

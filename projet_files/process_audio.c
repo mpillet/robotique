@@ -6,11 +6,10 @@
 
 #include <motors.h>
 #include <audio/microphone.h>
-#include <audio_processing.h>
 #include <process_image.h>
-#include <pi_regulator.h>
-
 #include <arm_math.h>
+#include <process_audio.h>
+#include <process_speed.h>
 
 
 
@@ -99,6 +98,7 @@ void sound_remote(float* data_left, float* data_right)
 		{
 			ready_to_go = 1;
 			clear_ready_to_turn();
+			already_turned = 0;
 		}
 	}
 }
