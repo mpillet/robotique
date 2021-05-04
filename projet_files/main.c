@@ -74,8 +74,6 @@ int main(void)
 
     //lancement des threads
     //stars the threads for the pi regulator and the processing of the image
-    chprintf((BaseSequentialStream *)&SDU1, "start = %d\n", get_selector());
-
     pi_regulator_start();
     process_image_start();
 

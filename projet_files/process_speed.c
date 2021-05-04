@@ -38,6 +38,7 @@ uint16_t accurate_speed(bool state, uint16_t sensor_1, uint16_t sensor_8,uint16_
 	}
 	else if(get_selector()==OFF)
 	{
+		clear_finished();
 		return 0;
 	}
 	else
@@ -59,16 +60,21 @@ static THD_FUNCTION(PiRegulator, arg)
 	uint16_t sensor_5 = 0;
 	uint16_t sensor_1 = 0;
 	uint16_t sensor_8 = 0;
-	//melody_t* song = NULL;
-
 
 
 	while(1)
 	{
-		if(get_ready_to_go())
+		if(get_finished())
+		{
+			melody_t* song = NULL;
+
+			right_motor_set_speed(0);
+			left_motor_set_speed(0);
+			playMelody(PIRATES_OF_THE_CARIBBEAN, ML_SIMPLE_PLAY, song);
+		}
+		else if(get_ready_to_go())
 		{
 			time = chVTGetSystemTime();
-			//playMelody(PIRATES_OF_THE_CARIBBEAN, ML_SIMPLE_PLAY, song);
 			sensor_4 = get_calibrated_prox(3);
 			sensor_5 = get_calibrated_prox(4);
 			sensor_1 = get_calibrated_prox(0);

@@ -13,6 +13,7 @@
 
 static uint16_t line_position = IMAGE_BUFFER_SIZE/2;	//middle
 static bool state = 0;
+static bool finished = 0;
 
 //semaphore
 static BSEMAPHORE_DECL(image_ready_sem, TRUE);
@@ -96,8 +97,11 @@ bool extract_line_width(uint8_t *buffer){
 	else
 	{
 		last_width = width = (end - begin);
-		line_position = (begin + end)/2; //gives the line position.
-		//chprintf((BaseSequentialStream *)&SDU1, "width_pix = %d\n", width);
+		if(width > FINISHED_WIDTH)
+		{
+			finished = 1;
+			clear_ready_to_turn();
+		}
 
 		state = STOP;
 	}
@@ -178,9 +182,18 @@ bool get_state(void){
 	return state;
 }
 
-uint16_t get_line_position(void){
-	return line_position;
+
+bool get_finished(void)
+{
+	return finished;
 }
+
+void clear_finished(void)
+{
+	finished = 1;
+}
+
+
 
 void process_image_start(void){
 	chThdCreateStatic(waProcessImage, sizeof(waProcessImage), NORMALPRIO+2, ProcessImage, NULL);
