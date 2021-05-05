@@ -20,7 +20,11 @@ static bool ready_to_turn = 0;
 uint16_t accurate_speed(bool state, uint16_t sensor_1, uint16_t sensor_8,uint16_t sensor_4,  uint16_t sensor_5)
 {
 
-	if((state == STOP) || !(get_ready_to_go()) || (sensor_1 > 200 && sensor_8 > 200))
+	if(get_selector()==OFF)
+	{
+		return 0;
+	}
+	else if((state == STOP) || !(get_ready_to_go()) || (sensor_1 > 200 && sensor_8 > 200))
 	{
 		ready_to_turn = 1;
 		clear_ready_to_go();
@@ -35,11 +39,6 @@ uint16_t accurate_speed(bool state, uint16_t sensor_1, uint16_t sensor_8,uint16_
 			return MOTOR_SPEED_LIMIT;
 		}
 		return acceleration_speed;
-	}
-	else if(get_selector()==OFF)
-	{
-		clear_finished();
-		return 0;
 	}
 	else
 	{
@@ -64,15 +63,16 @@ static THD_FUNCTION(PiRegulator, arg)
 
 	while(1)
 	{
-		if(get_finished())
+		stopCurrentMelody();
+		while((get_selector() == FINISHED))
 		{
 			melody_t* song = NULL;
-
 			right_motor_set_speed(0);
 			left_motor_set_speed(0);
 			playMelody(PIRATES_OF_THE_CARIBBEAN, ML_SIMPLE_PLAY, song);
 		}
-		else if(get_ready_to_go())
+
+		if(get_ready_to_go())
 		{
 			time = chVTGetSystemTime();
 			sensor_4 = get_calibrated_prox(3);
@@ -82,7 +82,6 @@ static THD_FUNCTION(PiRegulator, arg)
 
 			speed = accurate_speed(get_state(), sensor_1, sensor_8, sensor_4, sensor_5);
 			animation(speed);
-
 
 			//applies the speed from the PI regulator and the correction for the rotation
 			right_motor_set_speed(speed);

@@ -97,12 +97,6 @@ bool extract_line_width(uint8_t *buffer){
 	else
 	{
 		last_width = width = (end - begin);
-		if(width > FINISHED_WIDTH)
-		{
-			finished = 1;
-			clear_ready_to_turn();
-		}
-
 		state = STOP;
 	}
 
@@ -181,18 +175,6 @@ static THD_FUNCTION(ProcessImage, arg)
 bool get_state(void){
 	return state;
 }
-
-
-bool get_finished(void)
-{
-	return finished;
-}
-
-void clear_finished(void)
-{
-	finished = 1;
-}
-
 
 
 void process_image_start(void){

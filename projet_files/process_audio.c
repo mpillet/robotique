@@ -78,14 +78,14 @@ void sound_remote(float* data_left, float* data_right)
 	   (max_norm_index_right >= RIGHT_FREQ-MARGE && max_norm_index_right <= RIGHT_FREQ+MARGE))
 	{
 		left_motor_set_speed(300);
-		right_motor_set_speed(-300);
+		right_motor_set_speed(0);
 		already_turned = 1;
 	}
 	//go left
 	else if((max_norm_index_left >= LEFT_FREQ-MARGE && max_norm_index_left <= LEFT_FREQ+MARGE) &&
 			(max_norm_index_right >= LEFT_FREQ-MARGE && max_norm_index_right <= LEFT_FREQ+MARGE))
 	{
-		left_motor_set_speed(-300);
+		left_motor_set_speed(0);
 		right_motor_set_speed(300);
 		already_turned = 1;
 

@@ -19,7 +19,8 @@ extern "C" {
 #define ROTATION_COEFF			2 
 #define PXTOCM					1570.0f //experimental value
 #define MAX_PIX					400
-#define FINISHED_WIDTH			300
+#define FINISHED_WIDTH			150
+#define FINISHED				6
 #define MAX_DISTANCE 			25.0f
 #define ERROR_THRESHOLD			1 //[cm] because of the noise of the camera
 #define KP						10.
