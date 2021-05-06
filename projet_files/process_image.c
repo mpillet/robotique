@@ -11,9 +11,7 @@
 #include <process_audio.h>
 
 
-static uint16_t line_position = IMAGE_BUFFER_SIZE/2;	//middle
 static bool state = 0;
-static bool finished = 0;
 
 //semaphore
 static BSEMAPHORE_DECL(image_ready_sem, TRUE);
@@ -24,11 +22,9 @@ static BSEMAPHORE_DECL(image_ready_sem, TRUE);
  */
 bool extract_line_width(uint8_t *buffer){
 
-	uint16_t i = 0, begin = 0, end = 0, width = 0;
+	uint16_t i = 0, begin = 0, end = 0;
 	uint8_t stop = 0, wrong_line = 0, line_not_found = 0;
 	uint32_t mean = 0;
-	static uint16_t last_width = 0;
-
 
 	//performs an average
 	for(uint16_t i = 0 ; i < IMAGE_BUFFER_SIZE ; i++){
@@ -91,15 +87,12 @@ bool extract_line_width(uint8_t *buffer){
 	{
 		begin = 0;
 		end = 0;
-		width = 0;
 		state = CONTINUE;
 	}
 	else
 	{
-		last_width = width = (end - begin);
 		state = STOP;
 	}
-
 
 	return state;
 }
@@ -138,7 +131,6 @@ static THD_FUNCTION(ProcessImage, arg)
 	uint8_t image[IMAGE_BUFFER_SIZE] = {0};
 
 
-	bool send_to_computer = true;
 
     while(1)
     {
@@ -158,18 +150,9 @@ static THD_FUNCTION(ProcessImage, arg)
 		//search for a line in the image and gets its width in pixels
 		state = extract_line_width(image);
 
-		if(send_to_computer)
-		{
-			//sends to the computer the image
-			SendUint8ToComputer(image, IMAGE_BUFFER_SIZE);
-		}
-
-		//invert the bool
-		send_to_computer = !send_to_computer;
 
 	}
 }
-
 
 
 bool get_state(void){

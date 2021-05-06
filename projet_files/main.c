@@ -17,6 +17,8 @@
 #include <audio/play_melody.h>
 #include <process_audio.h>
 #include <process_speed.h>
+#include <audio/microphone.h>
+#include <audio/audio_thread.h>
 
 
 messagebus_t bus;
@@ -26,12 +28,7 @@ CONDVAR_DECL(bus_condvar);
 
 #define SEND_FROM_MIC
 
-void SendUint8ToComputer(uint8_t* data, uint16_t size) 
-{
-	chSequentialStreamWrite((BaseSequentialStream *)&SD3, (uint8_t*)"START", 5);
-	chSequentialStreamWrite((BaseSequentialStream *)&SD3, (uint8_t*)&size, sizeof(uint16_t));
-	chSequentialStreamWrite((BaseSequentialStream *)&SD3, (uint8_t*)data, size);
-}
+
 
 static void serial_start(void)
 {
@@ -67,10 +64,6 @@ int main(void)
 	//init melody
 	playMelodyStart();
 	dac_start();
-
-    //send_tab is used to save the state of the buffer to send (double buffering)
-    //to avoid modifications of the buffer while sending it
-    static float send_tab[FFT_SIZE];
 
     //lancement des threads
     //stars the threads for the pi regulator and the processing of the image

@@ -3,7 +3,7 @@
 #Simply adapt the lines below to be able to compile
 
 # Define project name here
-PROJECT = CamReg
+PROJECT = projet
 
 #Define path to the e-puck2_main-processor folder
 GLOBAL_PATH = ../../lib/e-puck2_main-processor
@@ -13,7 +13,6 @@ CSRC += ./main.c \
 		./process_speed.c \
 		./process_image.c \
 		./process_audio.c \
-		./fft.c \
 		
 
 #Header folders to include
