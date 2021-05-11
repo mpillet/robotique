@@ -1,122 +1,105 @@
 #include "ch.h"
 #include "hal.h"
 #include <math.h>
-#include <usbcfg.h>
-#include <chprintf.h>
+
 #include <main.h>
-#include <motors.h>
+#include <process_speed.h>
 #include <process_image.h>
+#include <process_audio.h>
+
 #include <sensors/proximity.h>
 #include <leds.h>
 #include <audio/play_melody.h>
-#include <process_speed.h>
-#include <process_audio.h>
 #include <selector.h>
+#include <motors.h>
 
+static bool ready_to_turn = NOT_READY;
 
-static bool ready_to_turn = 0;
-
-//simple PI regulator implementation
-uint16_t accurate_speed(bool state, uint16_t sensor_1, uint16_t sensor_8,uint16_t sensor_4,  uint16_t sensor_5)
+//gives the speed corresponding to the robot's actual state
+uint16_t accurate_speed(uint16_t front_sensor_r, uint16_t front_sensor_l,
+						uint16_t back_sensor_r,  uint16_t back_sensor_l, bool state)
 {
-
-	if(get_selector()==OFF)
+	//the robot is on mode off
+	if(get_selector() == OFF)
 	{
-		return 0;
+		return NO_SPEED;
 	}
-	else if((state == STOP) || !(get_ready_to_go()) || (sensor_1 > 200 && sensor_8 > 200))
+	//the robot needs to turn
+	else if((state == STOP) 						//because he found a line
+			|| ((front_sensor_r > LETHAL_SPACE) 	//because we put him a stop
+				&& (front_sensor_l > LETHAL_SPACE)))
 	{
-		ready_to_turn = 1;
+		ready_to_turn = READY;
 		clear_ready_to_go();
-		return 0;
+		return NO_SPEED;
 	}
-	else if((sensor_5 > 5) && (sensor_4 > 5))
+	//the robot accelerates in function of the values of the back sensors
+	else if((back_sensor_r > VITAL_SPACE) && (back_sensor_l > VITAL_SPACE))
 	{
-		uint16_t acceleration_speed = KP*(sensor_4+sensor_5)/2.+CORRECTION;
-
+		uint16_t mean_sensors = (back_sensor_r + back_sensor_l) / 2.;
+		uint16_t acceleration_speed = KP * mean_sensors + CORRECTION;
 		if(acceleration_speed > MOTOR_SPEED_LIMIT)
 		{
 			return MOTOR_SPEED_LIMIT;
 		}
 		return acceleration_speed;
 	}
+	//the robot is in its default case
 	else
 	{
-		return DEFAULT_SPEED;
+		return WALK_SPEED;
 	}
 }
 
-static THD_WORKING_AREA(waPiRegulator, 256);
-static THD_FUNCTION(PiRegulator, arg)
+static THD_WORKING_AREA(waProcessSpeed, WORKING_AREA_SPEED);
+static THD_FUNCTION(ProcessSpeed, arg)
 {
 	chRegSetThreadName(__FUNCTION__);
 	(void)arg;
 
 	systime_t time;
-
 	uint16_t speed = 0;
-	uint16_t sensor_4 = 0;
-	uint16_t sensor_5 = 0;
-	uint16_t sensor_1 = 0;
-	uint16_t sensor_8 = 0;
-
 
 	while(1)
 	{
 		stopCurrentMelody();
+		//the robot is in its final state
 		while((get_selector() == FINISHED))
 		{
 			melody_t* song = NULL;
-			right_motor_set_speed(0);
-			left_motor_set_speed(0);
+			right_motor_set_speed(NO_SPEED);
+			left_motor_set_speed(NO_SPEED);
 			playMelody(PIRATES_OF_THE_CARIBBEAN, ML_SIMPLE_PLAY, song);
 		}
-
+		//the robot is not turning, a speed needs to be determined
 		if(get_ready_to_go())
 		{
 			time = chVTGetSystemTime();
-			sensor_4 = get_calibrated_prox(3);
-			sensor_5 = get_calibrated_prox(4);
-			sensor_1 = get_calibrated_prox(0);
-			sensor_8 = get_calibrated_prox(7);
 
-			speed = accurate_speed(get_state(), sensor_1, sensor_8, sensor_4, sensor_5);
+			speed = accurate_speed(get_calibrated_prox(SENSOR1), get_calibrated_prox(SENSOR8),
+								   get_calibrated_prox(SENSOR4), get_calibrated_prox(SENSOR5), get_state());
 			animation(speed);
 
-			//applies the speed from the PI regulator and the correction for the rotation
 			right_motor_set_speed(speed);
 			left_motor_set_speed(speed);
 
-			//100Hz
-			chThdSleepUntilWindowed(time, time + MS2ST(10));
+			chThdSleepUntilWindowed(time, time + MS2ST(10)); 	//calls the thread at 100Hz
 		}
 	}
 }
 
-void pi_regulator_start(void){
-	chThdCreateStatic(waPiRegulator, sizeof(waPiRegulator), NORMALPRIO, PiRegulator, NULL);
-}
-
-bool get_ready_to_turn(void){
-	return ready_to_turn;
-}
-
-void clear_ready_to_turn(void)
-{
-	ready_to_turn = 0;
-}
-
+//makes the body led blink at a given frequency with respect to the proximity to the back sensors
 void animation(uint16_t speed)
 {
 	int counter = 0;
 	static bool last_led = 0;
 
-	if(speed <= DEFAULT_SPEED)
+	if(speed <= WALK_SPEED)				//no blinking
 	{
-		set_body_led(0);
-		last_led = 0;
+		set_body_led(TURN_OFF);
+		last_led = TURN_OFF;
 	}
-	else if(speed <= LOW_SPEED)
+	else if(speed <= LOW_SPEED)			//blinks slowly
 	{
 
 		while(counter < LOW_CNT)
@@ -126,16 +109,16 @@ void animation(uint16_t speed)
 		counter = 0;
 		if(last_led)
 		{
-			set_body_led(0);
-			last_led = 0;
+			set_body_led(TURN_OFF);
+			last_led = TURN_OFF;
 		}
 		else
 		{
-			set_body_led(1);
-			last_led = 1;
+			set_body_led(TURN_ON);
+			last_led = TURN_ON;
 		}
 	}
-	else if(speed <= MIDDLE_SPEED)
+	else if(speed <= MIDDLE_SPEED)		//blinks moderately
 	{
 
 		while(counter < MIDDLE_CNT)
@@ -145,16 +128,16 @@ void animation(uint16_t speed)
 		counter = 0;
 		if(last_led)
 		{
-			set_body_led(0);
-			last_led = 0;
+			set_body_led(TURN_OFF);
+			last_led = TURN_OFF;
 		}
 		else
 		{
-			set_body_led(1);
-			last_led = 1;
+			set_body_led(TURN_ON);
+			last_led = TURN_ON;
 		}
 	}
-	else if(speed <= HIGH_SPEED)
+	else if(speed <= HIGH_SPEED)		//blinks fast
 	{
 
 		while(counter < HIGH_CNT)
@@ -164,18 +147,17 @@ void animation(uint16_t speed)
 		counter = 0;
 		if(last_led)
 		{
-			set_body_led(0);
-			last_led = 0;
+			set_body_led(TURN_OFF);
+			last_led = TURN_OFF;
 		}
 		else
 		{
-			set_body_led(1);
-			last_led = 1;
+			set_body_led(TURN_ON);
+			last_led = TURN_ON;
 		}
 	}
-	else
+	else								//blinks super fast
 	{
-
 		while(counter < MAX_CNT)
 		{
 			counter++;
@@ -183,14 +165,28 @@ void animation(uint16_t speed)
 		counter = 0;
 		if(last_led)
 		{
-			set_body_led(0);
-			last_led = 0;
+			set_body_led(TURN_OFF);
+			last_led = TURN_OFF;
 		}
 		else
 		{
-			set_body_led(1);
-			last_led = 1;
+			set_body_led(TURN_ON);
+			last_led = TURN_ON;
 		}
 	}
 }
 
+void process_speed_start(void)
+{
+	chThdCreateStatic(waProcessSpeed, sizeof(waProcessSpeed), NORMALPRIO, ProcessSpeed, NULL);
+}
+
+bool get_ready_to_turn(void)
+{
+	return ready_to_turn;
+}
+
+void clear_ready_to_turn(void)
+{
+	ready_to_turn = NOT_READY;
+}

@@ -10,26 +10,14 @@ extern "C" {
 #include "parameter/parameter.h"
 
 
-//constants for the differents parts of the project
-#define OFF						8
-#define IMAGE_BUFFER_SIZE		640
-#define WIDTH_SLOPE				15
-#define MIN_LINE_WIDTH			70
-#define MAX_PIX					400
-#define FINISHED				6
-#define KP						10.
-#define CORRECTION				150.
+//constants for the main
+#define ONE_SECOND 				1000
+
+//constants used in different folders
 #define STOP					1
 #define CONTINUE				0
-#define DEFAULT_SPEED			200
-#define LOW_SPEED				400
-#define MIDDLE_SPEED			600
-#define HIGH_SPEED				800
-#define LOW_CNT 				8000000
-#define MIDDLE_CNT				4000000
-#define HIGH_CNT				2000000
-#define MAX_CNT					1000000
-
+#define DOUBLE					2
+#define NO_SPEED				0
 
 
 /** Robot wide IPC bus. */

@@ -1,75 +1,68 @@
 #include "ch.h"
 #include "hal.h"
-#include <chprintf.h>
-#include <usbcfg.h>
 
 #include <main.h>
-#include <camera/po8030.h>
-
 #include <process_image.h>
-#include <sensors/proximity.h>
 #include <process_audio.h>
 
+#include <camera/po8030.h>
 
-static bool state = 0;
-
-//semaphore
 static BSEMAPHORE_DECL(image_ready_sem, TRUE);
 
-/*
- *  Returns the line's width extracted from the image buffer given
- *  Returns 0 if line not found
- */
-bool extract_line_width(uint8_t *buffer){
+static bool state = CONTINUE;
 
-	uint16_t i = 0, begin = 0, end = 0;
-	uint8_t stop = 0, wrong_line = 0, line_not_found = 0;
+
+void find_state(uint8_t *buffer)
+{
 	uint32_t mean = 0;
+	uint16_t i = 0, begin = 0, end = 0;
+	bool stop = 0, wrong_line = 0, line_not_found = 0;
 
 	//performs an average
-	for(uint16_t i = 0 ; i < IMAGE_BUFFER_SIZE ; i++){
+	for(uint16_t i = 0 ; i < IMAGE_BUFFER_SIZE ; i++)
+	{
 		mean += buffer[i];
 	}
 	mean /= IMAGE_BUFFER_SIZE;
 
+	//says what sees the camera
 	do
 	{
-		wrong_line = 0;
+		wrong_line = false;
 		//search for a begin
-		while(stop == 0 && i < (IMAGE_BUFFER_SIZE - WIDTH_SLOPE))
+		while(!stop && i < (IMAGE_BUFFER_SIZE - WIDTH_SLOPE))
 		{
-			//the slope must at least be WIDTH_SLOPE wide and is compared
-			//to the mean of the image
 			if(buffer[i] > mean && buffer[i+WIDTH_SLOPE] < mean)
 			{
 				begin = i;
-				stop = 1;
+				stop = true;
 			}
 			i++;
 		}
 		//if a begin was found, search for an end
-		if (i < (IMAGE_BUFFER_SIZE - WIDTH_SLOPE) && begin)
+		if(begin && i < (IMAGE_BUFFER_SIZE - WIDTH_SLOPE))
 		{
-			stop = 0;
+			stop = false;
 
-			while(stop == 0 && i < IMAGE_BUFFER_SIZE)
+			while(!stop && i < IMAGE_BUFFER_SIZE)
 			{
 				if(buffer[i] > mean && buffer[i-WIDTH_SLOPE] < mean)
 				{
 					end = i;
-					stop = 1;
+					stop = true;
 				}
 				i++;
 			}
-			//if an end was not found
+			//if no end was found
 			if (i > IMAGE_BUFFER_SIZE || !end)
 			{
-				line_not_found = 1;
+				line_not_found = true;
 			}
 		}
-		else//if no begin was found
+		//if no begin was found
+		else
 		{
-			line_not_found = 1;
+			line_not_found = true;
 		}
 
 		//if a line too small has been detected
@@ -78,11 +71,12 @@ bool extract_line_width(uint8_t *buffer){
 			i = end;
 			begin = 0;
 			end = 0;
-			stop = 0;
-			wrong_line = 1;
+			stop = false;
+			wrong_line = true;
 		}
-	}while(wrong_line);
+	} while(wrong_line);
 
+	//gives the state the robot is in
 	if(line_not_found || wrong_line)
 	{
 		begin = 0;
@@ -93,74 +87,59 @@ bool extract_line_width(uint8_t *buffer){
 	{
 		state = STOP;
 	}
-
-	return state;
 }
 
-static THD_WORKING_AREA(waCaptureImage, 256);
-static THD_FUNCTION(CaptureImage, arg) {
-
+static THD_WORKING_AREA(waCaptureImage, WORKING_AREA_CAPT_IMAGE);
+static THD_FUNCTION(CaptureImage, arg)
+{
     chRegSetThreadName(__FUNCTION__);
     (void)arg;
 
-	//Takes pixels 0 to IMAGE_BUFFER_SIZE of the line 10 + 11 (minimum 2 lines because reasons)
-	po8030_advanced_config(FORMAT_RGB565, 0, 479, IMAGE_BUFFER_SIZE, 2, SUBSAMPLING_X1, SUBSAMPLING_X1);
+	po8030_advanced_config(FORMAT_RGB565, FIRST_PIXEL, BOTTOM_LINE, IMAGE_BUFFER_SIZE,
+						   TWO_LINES, SUBSAMPLING_X1, SUBSAMPLING_X1);
 	dcmi_enable_double_buffering();
 	dcmi_set_capture_mode(CAPTURE_ONE_SHOT);
 	dcmi_prepare();
 
-    while(1){
-        //starts a capture
+	while(1)
+    {
 		dcmi_capture_start();
-		//waits for the capture to be done
 		wait_image_ready();
-		//signals an image has been captured
 		chBSemSignal(&image_ready_sem);
     }
 }
 
-
-static THD_WORKING_AREA(waProcessImage, 1024);
+static THD_WORKING_AREA(waProcessImage, WORKING_AREA_PROC_IMAGE);
 static THD_FUNCTION(ProcessImage, arg)
 {
-
     chRegSetThreadName(__FUNCTION__);
     (void)arg;
 
 	uint8_t *img_buff_ptr;
 	uint8_t image[IMAGE_BUFFER_SIZE] = {0};
 
-
-
     while(1)
     {
-    	//waits until an image has been captured
         chBSemWait(&image_ready_sem);
-		//gets the pointer to the array filled with the last image in RGB565    
 		img_buff_ptr = dcmi_get_last_image_ptr();
 
-		//Extracts only the red pixels
-		for(uint16_t i = 0 ; i < (2 * IMAGE_BUFFER_SIZE) ; i+=2)
+		//Extracts only the red pixels in RGB format (5 first bits of the first byte for each pixel)
+		for(uint16_t i = 0 ; i < (DOUBLE*IMAGE_BUFFER_SIZE) ; i+=2)
 		{
-			//extracts first 5bits of the first byte
-			//takes nothing from the second byte
-			image[i/2] = (uint8_t)img_buff_ptr[i]&0xF8;		//Extracts only the red pixels
+			image[i/2] = (uint8_t)img_buff_ptr[i]&RED_PIX_MASK;
 		}
 
-		//search for a line in the image and gets its width in pixels
-		state = extract_line_width(image);
-
-
+		find_state(image);
 	}
 }
 
-
-bool get_state(void){
+bool get_state(void)
+{
 	return state;
 }
 
-
-void process_image_start(void){
+void process_image_start(void)
+{
 	chThdCreateStatic(waProcessImage, sizeof(waProcessImage), NORMALPRIO+2, ProcessImage, NULL);
 	chThdCreateStatic(waCaptureImage, sizeof(waCaptureImage), NORMALPRIO+2, CaptureImage, NULL);
 }
