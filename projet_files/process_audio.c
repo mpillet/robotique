@@ -84,6 +84,9 @@ void clear_ready_to_go(void)
 	ready_to_go = 0;
 }
 
+
+//Le reste du code est pris du TP5 et modifié pour notre application
+
 void processAudioData(int16_t *data, uint16_t num_samples)
 {
 	if(get_ready_to_turn())
