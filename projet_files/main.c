@@ -50,7 +50,7 @@ int main(void)
     /* Infinite loop. */
     while (1)
     {
-        chThdSleepMilliseconds(ONE_SECOND);
+    	chThdSleepMilliseconds(ONE_SECOND);
     }
 }
 

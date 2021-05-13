@@ -89,6 +89,9 @@ void find_state(uint8_t *buffer)
 	}
 }
 
+
+//Le reste du code est pris du TP4 et modifié pour notre application
+
 static THD_WORKING_AREA(waCaptureImage, WORKING_AREA_CAPT_IMAGE);
 static THD_FUNCTION(CaptureImage, arg)
 {
